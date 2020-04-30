@@ -1,4 +1,4 @@
-if !has("lua")
+if !has("lua") && !has("nvim")
 	echoerr "This plugin requires lua"
 	finish
 endif
@@ -12,12 +12,13 @@ hi FileName ctermfg=255 ctermbg=236 guibg=#303030
 hi ActiveLine ctermfg=255 ctermbg=238
 hi NonActiveLine ctermfg=255 ctermbg=235
 
-let s:plugin_path = escape(expand("<sfile>:p:h"), "\\")
-lua package.path = vim.eval("s:plugin_path") .. "/?.lua;"
-	\ .. package.path
-lua statusline = require("statusline")
+if !has("nvim")
+	let s:plugin_path = escape(expand("<sfile>:p:h:h"), "\\")
+	lua package.path = vim.eval("s:plugin_path") .. "/lua/?.lua;"
+				\ .. package.path
+endif
 function! GetStatusline()
-	return luaeval("statusline()")
+	return luaeval("require('statusline').getStatusline()")
 endfunction
 set statusline=%!GetStatusline()
 
