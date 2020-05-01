@@ -17,14 +17,19 @@ if !has("nvim")
 	lua package.path = vim.eval("s:plugin_path") .. "/lua/?.lua;"
 				\ .. package.path
 endif
-function! GetStatusline()
-	return luaeval("require('statusline').getStatusline()")
+function! UpdateStatusline()
+	lua require("statusline").update()
+	return ""
 endfunction
-set statusline=%!GetStatusline()
 
 augroup customstatusline
 	autocmd CmdlineEnter * redrawstatus
+	autocmd WinEnter * :call setwinvar(winnr(), "active", "true")
+	autocmd WinLeave * :call setwinvar(winnr(), "active", "false")
+	autocmd VimEnter * :call setwinvar(winnr(), "active", "true")
+	autocmd * :call UpdateStatusline()
 augroup END
+set statusline=%!UpdateStatusline()
 
 let &cpo = s:save_cpo
 unlet s:save_cpo

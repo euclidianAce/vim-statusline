@@ -1,20 +1,34 @@
 local hasNvim = vim.api and true
 
-local cmd, eval, isActive, getMode
-do
-	if hasNvim then
-		cmd = vim.api.nvim_command
-		eval = vim.api.nvim_eval
-		isActive = function()
-			return true
-		end
-	else
-		cmd = vim.command
-		eval = vim.eval
-		isActive = function(n)
-			return eval("g:statusline_winid") == eval("win_getid(winnr())")
-		end
+local cmd, eval, isActive, winnr, setwinvar, getwinvar
+if hasNvim then
+	cmd = vim.api.nvim_command
+	eval = vim.api.nvim_eval
+	winnr = function(n) 
+		local str = "winnr(\"" .. (n and tostring(n) or "") .. "\")"
+		return eval(str)
 	end
+	setwinvar = function(windowNumber, varName, value)
+		local windowId = eval("win_getid("..tostring(windowNumber)..")")
+		return eval(string.format(
+			"setwinvar(%d, \"%s\", \"%s\")",
+			windowId, varName, tostring(value)
+		))
+		--return vim.api.nvim_win_set_var(tostring(windowId), varName, value)
+	end
+	getwinvar = function(windowNumber, varName)
+		local windowId = eval("win_getid("..tostring(windowNumber)..")")
+		return eval(string.format(
+			"getwinvar(%d, \"%s\")",
+			windowId, varName
+		))
+	end
+else
+	cmd = vim.command
+	eval = vim.eval
+	winnr = vim.funcref("winnr")
+	setwinvar = vim.funcref("setwinvar")
+	getwinvar = vim.funcref("getwinvar")
 end
 
 local function setup(t, key, tab)
@@ -50,6 +64,7 @@ local function mode()
 	return modes[eval("mode()")]
 end
 local fmt = table.concat{
+	"%%{UpdateStatusline()}",
 	"%s %s ", -- Highlighed mode name
 	"%%#BufferNumber# %%n ", -- buffer number
 	"%%#FileName# %%.30f %%y%%r%%h%%w%%m ", -- filename, extension, modification flag
@@ -57,17 +72,37 @@ local fmt = table.concat{
 	"%%=", -- fill
 	"%%#LineNumber# %%l/%%L:%%c %%3p%%%%  ", -- line number, columns, percent through file
 }
-local function getStatusline()
-	local active = isActive()
+local function activeLine()
+	local data = mode()
+	local modeHighlight = data.hiGroup
+	local modeStr = data.modeName
+	local lineHighlight = "%#ActiveLine#"
+	return fmt:format(modeHighlight, modeStr, lineHighlight)
+end
+local function nonactiveLine()
 	local modeHighlight = "%#NonActiveLine#"
 	local modeStr = "      "
 	local lineHighlight = "%#NonActiveLine#"
-	if active then
-		local data = mode()
-		modeHighlight = data.hiGroup
-		modeStr = data.modeName
-		lineHighlight = "%#ActiveLine#"
-	end
 	return fmt:format(modeHighlight, modeStr, lineHighlight)
 end
-return {getStatusline=getStatusline}
+local function get(bool)
+	if bool then
+		return activeLine()
+	end
+	return nonactiveLine()
+end
+local function update()
+	local n = winnr("$")
+	if not n then
+		return
+	end
+	for i = 1, n do
+		-- vim complains about lua 5.1 not having ints,
+		-- but is fine with strings
+		local active = getwinvar(tostring(i), "active") == "true"
+		setwinvar(tostring(i), "&statusline", get(active))
+	end
+end
+return {
+	update = update
+}
